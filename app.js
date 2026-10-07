@@ -94,15 +94,15 @@ function setupGuide() {
 }
 function setup() {
   return `<section class="welcome"><p class="eyebrow">YOUR COUNCIL AWAITS</p><h2>Keep the game moving.</h2><p>Score the moments that matter. Reveal your Lords and settle the final tally when the game ends.</p></section>
-  <section class="panel setup-panel"><form id="setup"><p class="eyebrow">01 · YOUR GAME</p><h2>Choose your adventure</h2>
+  <form id="setup"><div class="setup-panels"><section class="panel setup-game-panel"><p class="eyebrow">01 · YOUR GAME</p><h2>Choose your adventure</h2>
   <p class="hint">Base is always included. Add either expansion, or play with both.</p>
   <div class="game-cards" role="group" aria-label="Game modules">${[
     ['base','Base','city','The City of Splendors'],['undermountain','Undermountain','mountain','Beneath Mount Waterdeep'],['skullport','Skullport','skull','The Port of Shadow']
   ].map(([id,name,symbol,tagline])=>{const active=id==='base'||setupSelection[id];return `<button type="button" class="selection-card game-card ${active?'is-selected':''}" data-module="${id}" aria-pressed="${active}" ${id==='base'?'aria-disabled="true"':''}><span class="card-state">${id==='base'?'Always included':active?'Selected':'Tap to add'}</span>${icon(symbol)}<strong>${name}</strong><span class="card-caption">${tagline}</span></button>`;}).join('')}</div>
-  <p class="game-summary">${gameLabel()}</p><div class="section-title faction-heading"><div><p class="eyebrow">02 · YOUR COUNCIL</p><h2>Pick your factions</h2></div><span class="badge">${setupSelection.factions.length} PLAYERS</span></div>
+  <p class="game-summary">${gameLabel()}</p></section><section class="panel setup-council-panel"><div class="section-title faction-heading"><div><p class="eyebrow">02 · YOUR COUNCIL</p><h2>Pick your factions</h2></div><span class="badge">${setupSelection.factions.length} PLAYERS</span></div>
   <p class="hint">Tap each faction at the table. Select at least two; ${setupSelection.undermountain||setupSelection.skullport?'up to six with an expansion':'up to five for Base'}. Selection order sets the scoreboard order.</p>
   <div class="faction-cards" role="group" aria-label="Player factions">${FACTIONS.map(f=>{const position=setupSelection.factions.indexOf(f.id);return `<button type="button" class="selection-card faction-card ${position>=0?'is-selected':''} faction-${f.id}" data-faction="${f.id}" aria-pressed="${position>=0}" style="--faction:${f.color}"><span class="card-state">${position>=0?'Player '+(position+1):''}</span>${icon(f.icon)}<strong>${f.name}</strong><span class="card-caption">${position>=0?'Selected · tap to remove':'Tap to select'}</span></button>`;}).join('')}</div>
-  <div class="setup-start"><p class="hint">${setupSelection.factions.length<2?'Choose at least two factions to begin.':'Your council is ready. Lords stay secret until final scoring.'}</p><button class="primary" type="submit" ${setupSelection.factions.length<2?'disabled':''}>Start game <span aria-hidden="true">→</span></button></div></form></section>${setupGuide()}`;
+  </section></div><div class="setup-start"><p class="hint">${setupSelection.factions.length<2?'Choose at least two factions to begin.':'Your council is ready. Lords stay secret until final scoring.'}</p><button class="primary" type="submit" ${setupSelection.factions.length<2?'disabled':''}>Start game <span aria-hidden="true">→</span></button></div></form>${setupGuide()}`;
 }
 function scoreboard() {
   return `<div class="scoreboard">${game.players.map((p,i)=>`<div class="player" style="--player:${p.color||colors[i]}"><span class="player-name">${escape(p.name)}</span><strong>${liveScore(i,game.events)}</strong><span class="unit">VICTORY POINTS</span></div>`).join('')}</div>`;

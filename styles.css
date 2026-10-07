@@ -72,3 +72,6 @@ body{position:relative}header,main,footer,#notice{position:relative;z-index:1}
 
 /* Opaque screen-edge masks meet the fixed frame and hide scrolling content. */
 .frame-edge{position:fixed;left:0;right:0;height:8px;z-index:9;pointer-events:none;background:linear-gradient(135deg,#201f1c,#111110);background-attachment:fixed}.frame-edge-top{top:0}.frame-edge-bottom{bottom:0}@media(max-width:700px){.frame-edge{height:4px}}
+
+/* Independent setup panels share a row on roomy screens. */
+.setup-panels{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:24px;align-items:start}.setup-panels>.panel{min-width:0}.setup-council-panel .faction-heading{margin-top:0;align-items:flex-start}.setup-council-panel .faction-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.setup-game-panel .game-summary{border-bottom:0;padding-bottom:0}.setup-council-panel .section-title{flex-wrap:wrap}.setup-council-panel .faction-card strong{font-size:22px}@media(max-width:900px){.setup-panels{grid-template-columns:minmax(0,1fr);gap:20px}}
