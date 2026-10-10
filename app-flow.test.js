@@ -13,7 +13,7 @@ function harness(saved=null){
  let id=0;
  const context=vm.createContext({...scoring,document:{querySelector:()=>app},localStorage:{getItem:()=>saved,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},window:{scrollTo:(...a)=>scrolls.push(a)},crypto:{randomUUID:()=>String(++id)},FormData:Data,HTMLInputElement:Input,confirm:()=>true,console});
  vm.runInContext(source,context);
- return {app,context,storage,wheel:type=>{const input=new Input(type);handlers.wheel({target:input});return input.blurred},run:s=>vm.runInContext(s,context),click:dataset=>handlers.click({target:{closest:()=>({dataset})}}),focus:target=>handlers.focusin({target}),submit:(id,values={})=>handlers.submit({preventDefault(){},target:{id,values}})};
+ return {app,context,storage,element,change:target=>handlers.change({target}),wheel:type=>{const input=new Input(type);handlers.wheel({target:input});return input.blurred},run:s=>vm.runInContext(s,context),click:dataset=>handlers.click({target:{closest:()=>({dataset})}}),focus:target=>handlers.focusin({target}),submit:(id,values={})=>handlers.submit({preventDefault(){},target:{id,values}})};
 }
 test('direct scoring carries selections, baseline scores, and blanks into resource scoring',()=>{
  const h=harness();assert.ok(h.app.innerHTML.includes('Jump to end game scoring'));
@@ -129,4 +129,55 @@ test('module toggles precede scores and govern sixth faction and last expansion 
  h.click({action:'quick-skullport'});assert.ok(h.app.innerHTML.includes('Skullport selected'));h.click({action:'quick-undermountain'});assert.equal(h.run('setupSelection.undermountain'),false);
  h.click({action:'quick-skullport'});assert.equal(h.run('setupSelection.skullport'),true);
  h.click({faction:'hands'});h.click({action:'quick-skullport'});assert.equal(h.run('setupSelection.skullport'),false);
+});
+
+
+test('Normal is default, Expert toggle persists for live play, and reset restores Normal',()=>{
+ const h=harness();assert.equal(h.run('setupSelection.expert'),false);assert.match(h.app.innerHTML,/Points displayed normally/);
+ h.click({action:'toggle-expert'});assert.match(h.app.innerHTML,/expert-selected/);assert.match(h.app.innerHTML,/All points hidden until end/);
+ h.run("setupSelection.factions=['shield','guard']");h.submit('setup');assert.equal(h.run('game.expert'),true);
+ h.submit('event',{quest:'123'});assert.match(h.run('scoreboard()'),/<strong>Hidden<\/strong>/);assert.doesNotMatch(h.run('scoreboard()'),/>123</);
+ const restored=harness(h.run('JSON.stringify(game)'));assert.equal(restored.run('game.expert'),true);assert.doesNotMatch(restored.run('scoreboard()'),/>123</);
+ h.click({action:'new'});assert.equal(h.run('setupSelection.expert'),false);
+ h.run("setupSelection.factions=['shield','guard']");h.submit('setup');h.submit('event',{quest:'123'});assert.match(h.run('scoreboard()'),/>123</);
+});
+
+test('Expert resources and Lord previews stay hidden until each Lord is confirmed',()=>{
+ const h=harness();h.run("setupSelection.factions=['shield','guard'];setupSelection.expert=true");h.submit('setup');
+ h.submit('event',{quest:'123'});h.click({player:'1'});h.submit('event',{quest:'456'});h.click({action:'end'});
+ assert.match(h.app.innerHTML,/id="resource-total-0">Hidden</);assert.doesNotMatch(h.app.innerHTML,/>123</);
+ const resources={values:{'player:0:adventurers':'5'},id:'resources'};h.change({closest:selector=>selector==='#resources'?resources:null});assert.equal(h.element.textContent,'Hidden');
+ h.submit('resources',resources.values);assert.equal(h.run('finishIndex'),0);assert.equal(h.run('beforeLordScore(0)'),128);
+ assert.doesNotMatch(h.app.innerHTML,/class="breakdown"/);assert.doesNotMatch(h.run('standings()'),/>128<|>456</);
+ h.run("game.players[0].final.lord='larissa'");const form={values:{lord:'larissa','count:qualifying':'1'}};
+ h.change({closest:selector=>selector==='#final'?form:null});assert.doesNotMatch(h.element.innerHTML,/class="breakdown"|134/);
+ h.submit('final',form.values);assert.equal(h.run('finishIndex'),1);assert.match(h.run('standings()'),/>134</);assert.doesNotMatch(h.run('standings()'),/>456</);assert.doesNotMatch(h.app.innerHTML,/class="breakdown"/);
+ const restored=harness(h.run('JSON.stringify(game)'));assert.match(restored.run('standings()'),/>134</);assert.doesNotMatch(restored.run('standings()'),/>456</);
+ const pair=h.run("LORDS.find(l=>l.kind==='pair').id");h.submit('final',{lord:pair,'count:pairTotal':'3'});assert.equal(h.run('view'),'results');assert.match(h.app.innerHTML,/>468</);assert.match(h.app.innerHTML,/>134</);
+});
+
+test('Normal mode and older saves retain resource totals and Lord previews',()=>{
+ const h=harness();h.run("setupSelection.factions=['shield','guard']");h.submit('setup');h.submit('event',{quest:'123'});h.click({action:'end'});
+ assert.match(h.app.innerHTML,/id="resource-total-0">123</);h.submit('resources',{});h.submit('final',{lord:'larissa','count:qualifying':'1'});
+ h.run("game.players[finishIndex].final.lord=LORDS.find(l=>l.kind==='pair').id;delete game.expert;render()");
+ assert.match(h.app.innerHTML,/class="breakdown"/);const restored=harness(h.run('JSON.stringify(game)'));assert.match(restored.app.innerHTML,/class="breakdown"/);
+});
+
+
+
+test('Expert standings rank only revealed scores and never compare hidden totals',()=>{
+ const h=harness();h.run("setupSelection.factions=['shield','guard','sashes'];setupSelection.expert=true");h.submit('setup');
+ h.submit('event',{quest:'10'});h.click({player:'1'});h.submit('event',{quest:'20'});h.click({player:'2'});h.submit('event',{quest:'30'});h.click({action:'end'});h.submit('resources',{});
+ assert.equal(h.run('finishOrder.join(",")'),'0,1,2');assert.doesNotMatch(h.run('standings()'),/standing-rank/);
+ h.submit('final',{lord:'larissa','count:qualifying':'9'});
+ const first=h.run('standings()');assert.match(first,/<strong>64<\/strong>/);
+ const revealed=first.match(/<ol aria-label="Revealed standings">(.*?)<\/ol>/s)[1];assert.match(revealed,/Knights of the Shield/);assert.doesNotMatch(revealed,/City Guard|Red Sashes/);
+ const pending=first.match(/<ul class="pending-reveals"[^>]*>(.*?)<\/ul>/s)[1];assert.ok(pending.indexOf('City Guard')<pending.indexOf('Red Sashes'));assert.doesNotMatch(pending,/standing-rank/);
+ h.run('game.events.find(e=>e.player===2).points=999');assert.equal(h.run('standings()'),first);
+ h.run('game.events.find(e=>e.player===2).points=30');
+ const pair=h.run("LORDS.find(l=>l.kind==='pair').id");h.submit('final',{lord:pair,'count:pairTotal':'20'});
+ const second=h.run('standings()').match(/<ol aria-label="Revealed standings">(.*?)<\/ol>/s)[1];assert.ok(second.indexOf('City Guard')<second.indexOf('Knights of the Shield'));assert.match(second,/>100</);assert.doesNotMatch(second,/Red Sashes/);
+ assert.equal(h.run('finishIndex'),2);
+ const restored=harness(h.run('JSON.stringify(game)'));assert.equal(restored.run('standings()'),h.run('standings()'));
+ h.run('game.expert=false');assert.match(h.run('standings()'),/Current standings/);assert.doesNotMatch(h.run('standings()'),/pending-reveals/);
 });

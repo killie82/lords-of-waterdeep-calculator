@@ -10,7 +10,7 @@ const FACTIONS = [
   {id:'sashes',name:'Red Sashes',color:'#df6d62',tone:'Red',icon:'sash'},
   {id:'hands',name:'Gray Hands',color:'#bbc3c7',tone:'Gray',icon:'hand'}
 ];
-const setupSelection = {undermountain:false,skullport:false,factions:[]};
+const setupSelection = {undermountain:false,skullport:false,expert:false,factions:[]};
 const QUEST_COLORS = {
   Arcana:{background:'#805293',ink:'#fff7ed',border:'#bc8dca'},
   Commerce:{background:'#70843c',ink:'#fff8e6',border:'#b0c477'},
@@ -105,7 +105,7 @@ function setup() {
   <p class="game-summary">${gameLabel()}</p></section><section class="panel setup-council-panel"><div class="section-title faction-heading"><div><p class="eyebrow">02 · YOUR COUNCIL</p><h2>Pick your factions</h2></div><span class="badge">${setupSelection.factions.length} PLAYERS</span></div>
   <p class="hint">Tap each faction at the table. Select at least two; ${setupSelection.undermountain||setupSelection.skullport?'up to six with an expansion':'up to five for Base'}. Selection order sets the scoreboard order.</p>
   <div class="faction-cards" role="group" aria-label="Player factions">${FACTIONS.map(f=>{const position=setupSelection.factions.indexOf(f.id);return `<button type="button" class="selection-card faction-card ${position>=0?'is-selected':''} faction-${f.id}" data-faction="${f.id}" aria-pressed="${position>=0}" style="--faction:${f.color}"><span class="card-state">${position>=0?'Player '+(position+1):''}</span>${icon(f.icon)}<strong>${f.name}</strong><span class="card-caption">${position>=0?'Selected · tap to remove':'Tap to select'}</span></button>`;}).join('')}</div>
-  </section></div><div class="setup-start"><p class="hint">${setupSelection.factions.length<2?'Choose at least two factions to begin.':'Your council is ready. Lords stay secret until final scoring.'}</p><button class="primary" type="submit" ${setupSelection.factions.length<2?'disabled':''}>Start game <span aria-hidden="true">→</span></button></div></form>${setupGuide()}`;
+  </section></div><div class="setup-start"><p class="hint">${setupSelection.factions.length<2?'Choose at least two factions to begin.':'Your council is ready. Lords stay secret until final scoring.'}</p><div class="setup-start-actions"><button type="button" data-action="toggle-expert" class="mode-toggle ${setupSelection.expert?'expert-selected':''}" aria-pressed="${setupSelection.expert}"><strong>${setupSelection.expert?'Expert Mode':'Normal'}</strong><br><small>${setupSelection.expert?'All points hidden until end':'Points displayed normally'}</small></button><button class="primary" type="submit" ${setupSelection.factions.length<2?'disabled':''}>Start game <span aria-hidden="true">→</span></button></div></div></form>${setupGuide()}`;
 }
 function directSetup() {
   return `<div class="toolbar">${button('back-setup','Back to home','quiet')}<p class="eyebrow">JUMP TO END GAME SCORING</p></div><section class="welcome"><h2>Set the current scores</h2><p>Use the scores before counting leftover cubes, Gold, skulls, or Lord bonuses.</p></section>
@@ -122,7 +122,7 @@ function openDirectSetup() {
   view='direct';render();window.scrollTo(0,0);
 }
 function scoreboard() {
-  return `<div class="scoreboard">${game.players.map((p,i)=>`<div class="player" style="--player:${p.color||colors[i]}"><span class="player-name">${escape(p.name)}</span><strong>${liveScore(i,game.events)}</strong><span class="unit">VICTORY POINTS</span></div>`).join('')}</div>`;
+  return `<div class="scoreboard">${game.players.map((p,i)=>`<div class="player" style="--player:${p.color||colors[i]}"><span class="player-name">${escape(p.name)}</span><strong>${game.expert?'Hidden':liveScore(i,game.events)}</strong><span class="unit">VICTORY POINTS</span></div>`).join('')}</div>`;
 }
 function entryDraft() {
   game.draft ||= game.drafts?.[selected] || {values:{},note:'',loss:false};
@@ -194,6 +194,11 @@ function questTypeBlocked(type,f) {
   return candidates.length===0||candidates.every(l=>lordClaimed(l.id));
 }
 function finalPreview(i) {try{if(!isLordAvailable(game.players[i].final.lord,game))return null;return finalScore(liveScore(i,game.events),game.players[i].final,game.skullport?game.penalty:0);}catch{return null;}}
+function lordPreviewMarkup() {
+  if(game.expert&&!game.players[finishIndex].final.confirmed)return '<p class="hint">Expert Mode: this faction’s score will appear after you confirm its Lord and continue.</p>';
+  const score=finalPreview(finishIndex);
+  return score?breakdown(score):'<p class="hint">Choose a bonus or Lord to preview the final score.</p>';
+}
 function breakdown(s) {return `<dl class="breakdown">${[['During play',s.live],['Leftover adventurers',s.adventurers],['Leftover gold',s.gold],['Lord bonus',s.lord],['Corruption penalty',s.corruption]].map(([k,v])=>`<div><dt>${k}</dt><dd>${signed(v)}</dd></div>`).join('')}<div class="total"><dt>Final score</dt><dd>${s.total}</dd></div></dl>`;}
 function beforeLordScore(i) {
   const f=game.players[i].final;
@@ -206,8 +211,8 @@ function allResources() {
   ${resourceInput('player:'+i+':adventurers','Total adventurers',p.final.adventurers,'1 VP per adventurer cube')}
   ${resourceInput('player:'+i+':gold','Gold coins',p.final.gold,'1 VP per 2 Gold')}
   ${game.skullport?(game.penalty===0?'<p class="hint">All skulls are on the corruption track · no skulls in your Tavern.</p>':resourceInput('player:'+i+':corruption','Skulls in your Tavern',p.final.corruption,`−${game.penalty} VP per skull`)):''}
-  <div class="resource-subtotal">Before Lord bonus <strong id="resource-total-${i}">${beforeLordScore(i)}</strong></div></section>`).join('')}</div>
-  <p class="hint">These totals include points earned during play. Lord bonuses stay hidden until the reveal. Ties reveal in player-number order.</p>
+  <div class="resource-subtotal">Before Lord bonus <strong id="resource-total-${i}">${game.expert?'Hidden':beforeLordScore(i)}</strong></div></section>`).join('')}</div>
+  <p class="hint">${game.expert?'Expert Mode: scores stay hidden until each Lord is confirmed.':'These totals include points earned during play. Lord bonuses stay hidden until the reveal.'} Ties reveal in player-number order.</p>
   <div class="nav-actions">${button(game.directEnd?'direct-state':'previous',game.directEnd?'Edit starting scores':'Back to play','quiet')}<button class="primary" type="submit">Reveal Lords →</button></div></form>`;
 }
 function readResources(form) {
@@ -238,13 +243,21 @@ function finish() {
     <h3>Other Lord bonuses</h3><div class="other-bonus-rows" role="group" aria-label="Other Lord bonuses">${specialRows.map(row=>`<div class="special-bonus-row">${row.map(id=>available.find(l=>l.id===id)).filter(Boolean).map(pill).join('')}</div>`).join('')}</div>
     <details id="lord-names" ${lordNamesOpen?'open':''}><summary>Select your Lord by name</summary><div class="lord-cards" role="group" aria-label="Choose your Lord by name">${available.map(l=>`<button type="button" data-lord="${l.id}" ${lordClaimed(l.id)?'disabled':''} class="lord-card ${mode==='name'&&f.lord===l.id?'chosen':''}" aria-pressed="${mode==='name'&&f.lord===l.id}"><strong>${escape(l.name)}</strong><span>${escape(bonusLabel(l))}</span></button>`).join('')}</div></details>
     <div id="lord-fields">${lordFields(f)}</div>
-    <div id="preview" aria-live="polite">${finalPreview(finishIndex)?breakdown(finalPreview(finishIndex)):'<p class="hint">Choose a bonus or Lord to preview the final score.</p>'}</div>
+    <div id="preview" aria-live="polite">${lordPreviewMarkup()}</div>
     <div class="nav-actions">${button('resources','Edit all resources','quiet')}<button class="primary" type="submit">${finishPosition===finishOrder.length-1?'Show final results':escape(game.players[finishOrder[finishPosition+1]].name)+' Reveal Lord →'}</button></div></form>`;
   return `<div class="toolbar"><p class="eyebrow">FINAL SCORING · FACTION ${finishPosition+1} OF ${game.players.length}</p>${button('live','Back to scoreboard','quiet')}</div>${standings()}<section class="panel final-panel">${body}</section>`;
 }
 function standings() {
+  if(game.expert){
+    const revealed=game.players.map((p,index)=>({p,index})).filter(r=>r.p.final.confirmed).map(r=>({...r,score:finalPreview(r.index).total})).sort((a,b)=>b.score-a.score||a.index-b.index);
+    const pending=finishOrder.filter(i=>!game.players[i].final.confirmed);
+    return `<section class="standings"><div class="section-title"><h3>Revealed standings</h3><span class="hint">Only revealed scores are ranked</span></div>
+    ${revealed.length?`<ol aria-label="Revealed standings">${revealed.map(r=>`<li style="--faction:${r.p.color}"><span class="standing-rank">${revealed.findIndex(x=>x.score===r.score)+1}</span><span class="standing-name">${escape(r.p.name)}<small>Final score</small></span><strong>${r.score}</strong></li>`).join('')}</ol>`:'<p class="hint">Standings appear as each Lord is revealed.</p>'}
+    ${pending.length?`<p class="eyebrow pending-reveal-heading">Awaiting Lord reveal</p><ul class="pending-reveals" aria-label="Factions awaiting reveal">${pending.map(i=>{const p=game.players[i];return `<li class="${i===finishIndex?'scoring-now':''}" style="--faction:${p.color}"><span class="standing-name">${escape(p.name)}<small>${i===finishIndex?'Revealing now':'Awaiting reveal'}</small></span><strong>Hidden</strong></li>`;}).join('')}</ul>`:''}
+    <p class="hint">Unrevealed factions stay in reveal order and are not compared with revealed scores.</p></section>`;
+  }
   const rows=game.players.map((p,i)=>({p,index:i,score:p.final.confirmed?finalPreview(i).total:beforeLordScore(i)})).sort((a,b)=>b.score-a.score);
-  return `<section class="standings"><div class="section-title"><h3>Current standings</h3><span class="hint">Scoring from last to first</span></div><ol>${rows.map((r,i)=>`<li class="${r.index===finishIndex?'scoring-now':''}" style="--faction:${r.p.color}"><span class="standing-rank">${rows.findIndex(x=>x.score===r.score)+1}</span><span class="standing-name">${escape(r.p.name)}<small>${r.p.final.confirmed?'Final score':r.index===finishIndex?'Revealing now · before Lord bonus':'Before Lord bonus'}</small></span><strong>${r.score}</strong></li>`).join('')}</ol><p class="hint">Totals update after each Lord is revealed and confirmed. Ties reveal in player-number order.</p></section>`;
+  return `<section class="standings"><div class="section-title"><h3>Current standings</h3><span class="hint">Scoring from last to first</span></div><ol>${rows.map((r,i)=>`<li class="${r.index===finishIndex?'scoring-now':''}" style="--faction:${r.p.color}"><span class="standing-rank">${rows.findIndex(x=>x.score===r.score)+1}</span><span class="standing-name">${escape(r.p.name)}<small>${r.p.final.confirmed?'Final score':r.index===finishIndex?'Revealing now · before Lord bonus':'Before Lord bonus'}</small></span><strong>${game.expert&&!r.p.final.confirmed?'Hidden':r.score}</strong></li>`).join('')}</ol><p class="hint">Totals update after each Lord is revealed and confirmed. Ties reveal in player-number order.</p></section>`;
 }
 function beginFinalScoring() {
   if(game.skullport&&game.penalty===0)game.players.forEach(p=>p.final.corruption=0);
@@ -288,9 +301,9 @@ function readFinal(form) {
 app.addEventListener('change',e=>{
   try {
     const resources=e.target.closest('#resources');
-    if(resources){readResources(resources);game.players.forEach((p,i)=>app.querySelector('#resource-total-'+i).textContent=beforeLordScore(i));return;}
+    if(resources){readResources(resources);game.players.forEach((p,i)=>app.querySelector('#resource-total-'+i).textContent=game.expert?'Hidden':beforeLordScore(i));return;}
     const form=e.target.closest('#final');
-    if(form) {readFinal(form);app.querySelector('#preview').innerHTML=finalPreview(finishIndex)?breakdown(finalPreview(finishIndex)):'<p class="hint">Choose a bonus or Lord to preview the final score.</p>';}
+    if(form) {readFinal(form);app.querySelector('#preview').innerHTML=lordPreviewMarkup();}
   } catch(error){say(error.message);}
 });
 // Defocus number fields before the browser can spin their value on wheel scroll.
@@ -343,10 +356,10 @@ app.addEventListener('submit',e=>{
       game={version:1,directEnd:true,players,events:scores.map((score,i)=>({id:crypto.randomUUID(),player:i,source:'other',points:score,note:'Score before final scoring',round:null})),round:1,trackRounds:false,penalty,undermountain,skullport,finished:false};
       selected=0;beginFinalScoring();
     } else if(e.target.id==='setup') {
-      const {undermountain,skullport,factions}=setupSelection;
+      const {undermountain,skullport,factions,expert}=setupSelection;
       if(factions.length<2)throw new Error('Choose at least two factions.');
       if(factions.length>5&&!undermountain&&!skullport)throw new Error('Base supports up to five factions. Add an expansion for six.');
-      game={version:1,players:factions.map(id=>{const f=FACTIONS.find(f=>f.id===id);return {faction:id,name:f.name,color:f.color,final:emptyFinal()};}),events:[],round:1,trackRounds:false,penalty:1,undermountain,skullport,finished:false};historyOpen=false;roundsOpen=false;selected=0;view='live';save();render();say('The game has started.');
+      game={version:1,expert,players:factions.map(id=>{const f=FACTIONS.find(f=>f.id===id);return {faction:id,name:f.name,color:f.color,final:emptyFinal()};}),events:[],round:1,trackRounds:false,penalty:1,undermountain,skullport,finished:false};historyOpen=false;roundsOpen=false;selected=0;view='live';save();render();say('The game has started.');
     } else if(e.target.id==='event') {
       const values=Object.fromEntries(Object.keys(sourceInfo).map(key=>[key,data.get(key)]));
       if(entryDraft().loss&&values.other)values.other='-'+String(values.other).replace(/^-/, '');
@@ -409,6 +422,7 @@ app.addEventListener('click',e=>{
   if(b.dataset.delete){game.events=game.events.filter(ev=>ev.id!==b.dataset.delete);game.finished=false;game.players.forEach(p=>p.final.confirmed=false);save();render();say('Entry removed.');}
   if(b.dataset.edit!==undefined){finishOrder=finalScoringOrder(game.players.map((p,i)=>liveScore(i,game.events)));finishIndex=Number(b.dataset.edit);finishPosition=finishOrder.indexOf(finishIndex);finishStep='resources';lordNamesOpen=false;game.finished=false;view='final';save();render();window.scrollTo(0,0);}
   switch(b.dataset.action) {
+    case 'toggle-expert':setupSelection.expert=!setupSelection.expert;render();app.querySelector('[data-action="toggle-expert"]').focus({preventScroll:true});break;
     case 'jump-end':openDirectSetup();break;
     case 'direct-state':try{readResources(app.querySelector('#resources'));openDirectSetup();}catch(error){say(error.message);}break;
     case 'back-setup':view='setup';render();window.scrollTo(0,0);break;
@@ -425,7 +439,7 @@ app.addEventListener('click',e=>{
     case 'resources':try{readFinal(app.querySelector('#final'));finishStep='resources';save();render();window.scrollTo(0,0);}catch(error){say(error.message);}break;
     case 'previous':try{readResources(app.querySelector('#resources'));view='live';save();render();window.scrollTo(0,0);}catch(error){say(error.message);}break;
     case 'live':view='live';save();render();break;
-    case 'new':if(confirm('Reset the game? This clears all scores and selections and returns to the home page.')){game=null;localStorage.removeItem(KEY);setupSelection.factions=[];setupSelection.undermountain=false;setupSelection.skullport=false;quickScores={};quickPenalty=null;penaltyModal=false;pendingPenalty=null;historyOpen=false;roundsOpen=false;setupGuideOpen=false;lordNamesOpen=false;selected=0;finishIndex=0;finishPosition=0;finishOrder=[];finishStep='resources';view='setup';render();window.scrollTo(0,0);say('Game reset. Ready for a new game.');}break;
+    case 'new':if(confirm('Reset the game? This clears all scores and selections and returns to the home page.')){game=null;localStorage.removeItem(KEY);setupSelection.factions=[];setupSelection.undermountain=false;setupSelection.skullport=false;setupSelection.expert=false;quickScores={};quickPenalty=null;penaltyModal=false;pendingPenalty=null;historyOpen=false;roundsOpen=false;setupGuideOpen=false;lordNamesOpen=false;selected=0;finishIndex=0;finishPosition=0;finishOrder=[];finishStep='resources';view='setup';render();window.scrollTo(0,0);say('Game reset. Ready for a new game.');}break;
   }
 });
 render();
