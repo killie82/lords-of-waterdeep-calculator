@@ -160,7 +160,7 @@ function lordFields(f) {
     const types=selectedQuestTypes(f).length===2?selectedQuestTypes(f):l.types;
     return `<p class="hint">Count your completed ${types.join(' and ')} Quests together. Include Plot Quests; exclude Mandatory Quests.</p>${bonusInput('count:pairTotal',`Total ${types.join(' and ')} Quests completed`,f.counts.pairTotal??l.types.reduce((sum,type)=>sum+count(f.counts[type]??0),0),4)}`;
   }
-  if(l.kind==='builder')return `<p class="hint">6 VP per building you control at the end of the game.</p>${n('qualifying','Buildings controlled')}`;
+  if(l.kind==='builder')return `<p class="hint">6 VP per building you control at the end of the game.</p>${bonusInput('count:qualifying','Buildings controlled (maximum 9)',f.counts.qualifying??0,l.rate,9)}`;
   if(l.kind==='module'){
     const moduleName=l.module==='skullport'?'Skullport':'Undermountain';
     return `<p class="hint">Count completed quests and controlled buildings bearing the ${moduleName} set symbol together. Exclude Mandatory Quests.</p>${bonusInput('count:moduleTotal',`${moduleName} quests completed and buildings controlled`,f.counts.moduleTotal??(count(f.counts.quests??0)+count(f.counts.buildings??0)),4)}`;
@@ -170,8 +170,8 @@ function lordFields(f) {
   if(l.kind==='large')return `<p class="hint">5 VP for each completed Quest with a printed reward of 10 VP or more. Additional Plot Quest effects do not raise the printed reward.</p>${n('qualifying','Quests with a reward of 10+ VP')}`;
   return `<p class="hint">3 VP per completed non-Mandatory Quest, including Plot Quests.</p>${n('qualifying','Non-Mandatory Quests completed')}`;
 }
-function bonusInput(name,label,value,rate) {
-  return `<div class="bonus-input"><div><label for="bonus-${name}">${label}</label><span class="multiplier">× ${rate} VP each</span></div><input id="bonus-${name}" name="${name}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${escape(value||'')}" ></div>`;
+function bonusInput(name,label,value,rate,max=10000) {
+  return `<div class="bonus-input"><div><label for="bonus-${name}">${label}</label><span class="multiplier">× ${rate} VP each</span></div><input id="bonus-${name}" name="${name}" type="number" inputmode="numeric" min="0" max="${max}" step="1" value="${escape(value?Math.min(value,max):'')}" ></div>`;
 }
 function bonusLabel(l) {
   if(l.kind==='pair')return l.types.join(' + ');
@@ -183,6 +183,13 @@ function selectedQuestTypes(f) {
   // Keep previously saved pair-pill selections selected in the new picker.
   if(f.selectionMode==='pill'&&lord?.kind==='pair')return lord.types;
   return [];
+}
+function lordClaimed(id) {return game.players.some((p,i)=>i!==finishIndex&&p.final.confirmed&&p.final.lord===id);}
+function questTypeBlocked(type,f) {
+  const selected=selectedQuestTypes(f);
+  if(selected.includes(type))return false;
+  const candidates=availableLords(game).filter(l=>l.kind==='pair'&&l.types.includes(type)&&selected.every(t=>l.types.includes(t)));
+  return candidates.length===0||candidates.every(l=>lordClaimed(l.id));
 }
 function finalPreview(i) {try{if(!isLordAvailable(game.players[i].final.lord,game))return null;return finalScore(liveScore(i,game.events),game.players[i].final,game.skullport?game.penalty:0);}catch{return null;}}
 function breakdown(s) {return `<dl class="breakdown">${[['During play',s.live],['Leftover adventurers',s.adventurers],['Leftover gold',s.gold],['Lord bonus',s.lord],['Corruption penalty',s.corruption]].map(([k,v])=>`<div><dt>${k}</dt><dd>${signed(v)}</dd></div>`).join('')}<div class="total"><dt>Final score</dt><dd>${s.total}</dd></div></dl>`;}
@@ -217,7 +224,7 @@ function finish() {
   const available=availableLords(game);
   const mode=f.selectionMode||'name';
   const questTypes=selectedQuestTypes(f);
-  const pill=l=>`<button type="button" data-bonus="${l.id}" class="bonus-pill ${mode==='pill'&&f.lord===l.id?'chosen':''}" aria-pressed="${mode==='pill'&&f.lord===l.id}">${escape(bonusLabel(l))}</button>`;
+  const pill=l=>`<button type="button" data-bonus="${l.id}" ${lordClaimed(l.id)?'disabled':''} class="bonus-pill ${mode==='pill'&&f.lord===l.id?'chosen':''}" aria-pressed="${mode==='pill'&&f.lord===l.id}">${escape(bonusLabel(l))}</button>`;
   const specialRows=[
     ['larissa',...(game.skullport?['irusyl']:[])],
     ...(game.skullport?[['sangalor','xanathar']]:[]),
@@ -225,9 +232,9 @@ function finish() {
   ];
   const body=`
     <p class="eyebrow">02 · REVEAL YOUR LORD</p><h2>${escape(p.name)}</h2><p class="hint">Choose the bonus printed on your card, or find your Lord by name below.</p>
-    <form id="final"><input type="hidden" name="lord" value="${escape(f.lord)}"><h3>Lord Quest Types <span class="optional">pick two</span></h3><p class="hint" id="quest-type-help">${questTypes.length} of 2 selected · 4 VP for each completed Quest of either type.</p><div class="bonus-pills" role="group" aria-label="Lord Quest Types, pick two" aria-describedby="quest-type-help">${QUEST_TYPES.map(type=>{const color=QUEST_COLORS[type];return `<button type="button" data-quest-type="${type}" class="bonus-pill quest-type-pill" aria-pressed="${questTypes.includes(type)}" style="--quest-bg:${color.background};--quest-ink:${color.ink};--quest-border:${color.border}">${type}</button>`;}).join('')}</div>
+    <form id="final"><input type="hidden" name="lord" value="${escape(f.lord)}"><h3>Lord Quest Types <span class="optional">pick two</span></h3><p class="hint" id="quest-type-help">${questTypes.length} of 2 selected · 4 VP for each completed Quest of either type.</p><div class="bonus-pills" role="group" aria-label="Lord Quest Types, pick two" aria-describedby="quest-type-help">${QUEST_TYPES.map(type=>{const color=QUEST_COLORS[type];return `<button type="button" data-quest-type="${type}" ${questTypeBlocked(type,f)?'disabled':''} class="bonus-pill quest-type-pill" aria-pressed="${questTypes.includes(type)}" style="--quest-bg:${color.background};--quest-ink:${color.ink};--quest-border:${color.border}">${type}</button>`;}).join('')}</div>
     <h3>Other Lord bonuses</h3><div class="other-bonus-rows" role="group" aria-label="Other Lord bonuses">${specialRows.map(row=>`<div class="special-bonus-row">${row.map(id=>available.find(l=>l.id===id)).filter(Boolean).map(pill).join('')}</div>`).join('')}</div>
-    <details id="lord-names" ${lordNamesOpen?'open':''}><summary>Select your Lord by name</summary><div class="lord-cards" role="group" aria-label="Choose your Lord by name">${available.map(l=>`<button type="button" data-lord="${l.id}" class="lord-card ${mode==='name'&&f.lord===l.id?'chosen':''}" aria-pressed="${mode==='name'&&f.lord===l.id}"><strong>${escape(l.name)}</strong><span>${escape(bonusLabel(l))}</span></button>`).join('')}</div></details>
+    <details id="lord-names" ${lordNamesOpen?'open':''}><summary>Select your Lord by name</summary><div class="lord-cards" role="group" aria-label="Choose your Lord by name">${available.map(l=>`<button type="button" data-lord="${l.id}" ${lordClaimed(l.id)?'disabled':''} class="lord-card ${mode==='name'&&f.lord===l.id?'chosen':''}" aria-pressed="${mode==='name'&&f.lord===l.id}"><strong>${escape(l.name)}</strong><span>${escape(bonusLabel(l))}</span></button>`).join('')}</div></details>
     <div id="lord-fields">${lordFields(f)}</div>
     <div id="preview" aria-live="polite">${finalPreview(finishIndex)?breakdown(finalPreview(finishIndex)):'<p class="hint">Choose a bonus or Lord to preview the final score.</p>'}</div>
     <div class="nav-actions">${button('resources','Edit all resources','quiet')}<button class="primary" type="submit">${finishPosition===finishOrder.length-1?'Show final results':escape(game.players[finishOrder[finishPosition+1]].name)+' Reveal Lord →'}</button></div></form>`;
@@ -273,6 +280,7 @@ function readFinal(form) {
   if(f.lord&&!isLordAvailable(f.lord,game))throw new Error('This Lord requires an expansion that was not selected for this game.');
   for(const key of ['adventurers','gold','corruption'])if(data.has(key))f[key]=count(data.get(key));
   for(const [key,value] of data)if(key.startsWith('count:'))f.counts[key.slice(6)]=count(value);
+  if(f.lord==='larissa'&&f.counts.qualifying!==undefined)f.counts.qualifying=Math.min(f.counts.qualifying,9);
   f.confirmed=false;game.players[finishIndex].final=f;game.finished=false;save();
 }
 app.addEventListener('change',e=>{
@@ -292,7 +300,7 @@ app.addEventListener('beforeinput',e=>{
 });
 function includeQuickFaction(id) {
   if(setupSelection.factions.includes(id))return true;
-  if(setupSelection.factions.length>=(!setupSelection.undermountain&&!setupSelection.skullport?5:6)){say('Base supports up to five factions. Select Skullport or remove a faction to add another.');return false;}
+  if(setupSelection.factions.length>=6){say('Up to six factions can be included.');return false;}
   setupSelection.factions.push(id);return true;
 }
 app.addEventListener('focusin',e=>{
@@ -303,6 +311,7 @@ app.addEventListener('focusin',e=>{
   render();app.querySelector('#quick-'+id).focus({preventScroll:true});
 });
 app.addEventListener('input',e=>{
+  if(e.target.closest('#final')&&e.target.name==='count:qualifying'&&game.players[finishIndex].final.lord==='larissa'&&Number(e.target.value)>9)e.target.value='9';
   if(e.target.closest('#direct-setup')&&e.target.name.startsWith('score:')){const id=e.target.name.slice(6);if(e.target.value!==''&&!includeQuickFaction(id)){e.target.value='';return;}quickScores[id]=e.target.value;return;}
   if(e.target.closest('#event')) {
     const draft=entryDraft();
@@ -324,12 +333,12 @@ app.addEventListener('submit',e=>{
       for(const f of FACTIONS){const value=data.get('score:'+f.id);if(value!==null&&String(value).trim()!==''&&!includeQuickFaction(f.id))throw new Error('Too many factions for the selected game.');}
       const {factions,undermountain,skullport}=setupSelection;
       if(factions.length<2||new Set(factions).size!==factions.length)throw new Error('Choose at least two factions.');
-      if(factions.length>5&&!undermountain&&!skullport)throw new Error('Base supports up to five players.');
+      if(factions.length>6)throw new Error('Choose up to six factions.');
       const penalty=skullport?skullTrackPenalty(quickPenalty):1;
       const scores=factions.map(id=>points(data.get('score:'+id)||0));
       const old=game?.directEnd?game.players:[];
       const players=factions.map(id=>{const f=FACTIONS.find(f=>f.id===id);return {faction:id,name:f.name,color:f.color,final:{...(old.find(p=>p.faction===id)?.final||emptyFinal()),confirmed:false}};});
-      game={version:1,directEnd:true,players,events:scores.map((score,i)=>({id:crypto.randomUUID(),player:i,source:'other',points:score,note:'Score before final scoring',round:null})),round:1,trackRounds:false,penalty,undermountain,skullport,finished:false};
+      game={version:1,directEnd:true,players,events:scores.map((score,i)=>({id:crypto.randomUUID(),player:i,source:'other',points:score,note:'Score before final scoring',round:null})),round:1,trackRounds:false,penalty,undermountain:undermountain||(factions.length===6&&!skullport),skullport,finished:false};
       selected=0;beginFinalScoring();
     } else if(e.target.id==='setup') {
       const {undermountain,skullport,factions}=setupSelection;
@@ -347,7 +356,7 @@ app.addEventListener('submit',e=>{
     } else if(e.target.id==='resources') {
       readResources(e.target);game.players.forEach(p=>p.final.confirmed=false);finishOrder=finalScoringOrder(game.players.map((p,i)=>beforeLordScore(i)));finishPosition=0;finishIndex=finishOrder[0];finishStep='lord';lordNamesOpen=false;save();render();window.scrollTo(0,0);
     } else if(e.target.id==='final') {
-      readFinal(e.target);if(!isLordAvailable(game.players[finishIndex].final.lord,game))throw new Error('Choose an available Lord or bonus before continuing.');finalScore(liveScore(finishIndex,game.events),game.players[finishIndex].final,game.skullport?game.penalty:0);game.players[finishIndex].final.confirmed=true;
+      readFinal(e.target);if(lordClaimed(game.players[finishIndex].final.lord))throw new Error('That Lord has already been revealed by another faction.');if(!isLordAvailable(game.players[finishIndex].final.lord,game))throw new Error('Choose an available Lord or bonus before continuing.');finalScore(liveScore(finishIndex,game.events),game.players[finishIndex].final,game.skullport?game.penalty:0);game.players[finishIndex].final.confirmed=true;
       if(finishPosition<finishOrder.length-1){finishPosition++;finishIndex=finishOrder[finishPosition];finishStep='lord';lordNamesOpen=false;}
       else {const incomplete=finishOrder.findIndex(i=>!game.players[i].final.confirmed);if(incomplete>=0){finishPosition=incomplete;finishIndex=finishOrder[incomplete];finishStep='lord';}else {game.finished=true;view='results';}}
       save();render();window.scrollTo(0,0);
@@ -355,13 +364,14 @@ app.addEventListener('submit',e=>{
   } catch(error){say(error.message);}
 });
 app.addEventListener('click',e=>{
-  const b=e.target.closest('button');if(!b)return;
+  const b=e.target.closest('button');if(!b||b.disabled)return;
   if(b.dataset.quickPenalty!==undefined){quickPenalty=skullTrackPenalty(b.dataset.quickPenalty);render();app.querySelector(`[data-quick-penalty="${quickPenalty}"]`).focus({preventScroll:true});return;}
   if(b.dataset.trackPenalty!==undefined){pendingPenalty=skullTrackPenalty(b.dataset.trackPenalty);render();app.querySelector(`[data-track-penalty="${pendingPenalty}"]`).focus();return;}
   if(b.dataset.questType){
     try{
       readFinal(app.querySelector('#final'));const f=game.players[finishIndex].final;
       const types=[...selectedQuestTypes(f)], type=b.dataset.questType, index=types.indexOf(type);
+      if(questTypeBlocked(type,f)){say('That quest pairing belongs to an already revealed Lord.');return;}
       if(index>=0)types.splice(index,1);
       else {if(types.length===2){say('Two Quest types are selected. Tap one to remove it before choosing another.');return;}types.push(type);}
       f.counts={};
@@ -374,7 +384,7 @@ app.addEventListener('click',e=>{
     try {
       readFinal(app.querySelector('#final'));const f=game.players[finishIndex].final;
       const lordId=b.dataset.lord||b.dataset.bonus;
-      if(lordId){if(!isLordAvailable(lordId,game))throw new Error('This Lord requires an expansion that was not selected for this game.');if(f.lord!==lordId)f.counts={};f.lord=lordId;f.selectionMode=b.dataset.bonus?'pill':'name';f.questTypes=[];}
+      if(lordId){if(lordClaimed(lordId))throw new Error('That Lord has already been revealed by another faction.');if(!isLordAvailable(lordId,game))throw new Error('This Lord requires an expansion that was not selected for this game.');if(f.lord!==lordId)f.counts={};f.lord=lordId;f.selectionMode=b.dataset.bonus?'pill':'name';f.questTypes=[];}
       save();render();
       const attribute=b.dataset.lord?'lord':'bonus';app.querySelector(`[data-${attribute}="${b.dataset[attribute]}"]`).focus();
     }catch(error){say(error.message);}return;
@@ -387,7 +397,7 @@ app.addEventListener('click',e=>{
   if(b.dataset.faction){
     const id=b.dataset.faction,index=setupSelection.factions.indexOf(id);
     if(index>=0){setupSelection.factions.splice(index,1);if(view==='direct')quickScores[id]='';}
-    else {if(setupSelection.factions.length===5&&!setupSelection.undermountain&&!setupSelection.skullport){say('Base supports up to five factions. Select an expansion to add a sixth.');return;}setupSelection.factions.push(id);}
+    else {if(view!=='direct'&&setupSelection.factions.length===5&&!setupSelection.undermountain&&!setupSelection.skullport){say('Base supports up to five factions. Select an expansion to add a sixth.');return;}setupSelection.factions.push(id);}
     render();app.querySelector(`[data-faction="${id}"]`).focus();say(setupSelection.factions.length+' factions selected.');
   }
   if(b.dataset.skullStep){const draft=entryDraft();draft.values.emptyTrack=Math.max(0,Math.min(10000,count(draft.values.emptyTrack||0)+(b.dataset.skullStep==='plus'?10:-10)));save();const row=app.querySelector('.empty-track-row');row.outerHTML=emptyTrackRow();return;}
@@ -400,7 +410,7 @@ app.addEventListener('click',e=>{
     case 'jump-end':openDirectSetup();break;
     case 'direct-state':try{readResources(app.querySelector('#resources'));openDirectSetup();}catch(error){say(error.message);}break;
     case 'back-setup':view='setup';render();window.scrollTo(0,0);break;
-    case 'quick-skullport':if(setupSelection.skullport&&setupSelection.factions.length===6&&!setupSelection.undermountain){say('Remove a faction before turning off Skullport. Base supports up to five players.');break;}setupSelection.skullport=!setupSelection.skullport;render();app.querySelector('[data-action="quick-skullport"]').focus({preventScroll:true});break;
+    case 'quick-skullport':setupSelection.skullport=!setupSelection.skullport;render();app.querySelector('[data-action="quick-skullport"]').focus({preventScroll:true});break;
     case 'undo':if(game.events.length){const latest=game.events.at(-1);if(latest.batch)game.events=game.events.filter(e=>e.batch!==latest.batch);else game.events.pop();game.finished=false;game.players.forEach(p=>p.final.confirmed=false);save();render();say('Latest submission undone.');}break;
     case 'enable-rounds':game.trackRounds=true;save();render();say('Round tracking enabled. Set the current round for your table.');break;
     case 'disable-rounds':game.trackRounds=false;save();render();say('Round tracking turned off.');break;

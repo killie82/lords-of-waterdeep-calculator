@@ -35,11 +35,10 @@ test('Skullport direct setup requires a track value selected inline',()=>{
  h.submit('direct-setup',{'score:shield':'30','score:guard':'40'});assert.equal(h.run('game.penalty'),4);
  h.submit('resources',{'player:0:corruption':'2'});assert.equal(h.run('beforeLordScore(0)'),22);
 });
-test('direct setup rejects invalid scores and six-player base games before creating state',()=>{
+test('direct setup rejects invalid scores but allows six factions without module selection',()=>{
  const h=harness();h.run("setupSelection.factions=['shield','guard']");h.click({action:'jump-end'});
  h.submit('direct-setup',{'score:shield':'1.5'});assert.equal(h.run('game'),null);
- h.run('setupSelection.factions=FACTIONS.map(f=>f.id)');h.submit('direct-setup',{});assert.equal(h.run('game'),null);
- h.run('setupSelection.undermountain=true');h.submit('direct-setup',{});assert.equal(h.run('game.players.length'),6);
+ h.run('setupSelection.factions=FACTIONS.map(f=>f.id)');h.submit('direct-setup',{});assert.equal(h.run('game.players.length'),6);assert.equal(h.run('game.undermountain'),true);
 });
 test('editing initial scores preserves entered resources and saved reveal resumes',()=>{
  const h=harness();h.run("setupSelection.factions=['shield','guard']");h.click({action:'jump-end'});h.submit('direct-setup',{'score:shield':'10','score:guard':'20'});
@@ -85,7 +84,7 @@ test('victory headings include icons and faction colors for single and shared wi
 test('Game Reset is available on every page and clears modal and temporary state',()=>{
  const h=harness();assert.ok(h.app.innerHTML.includes('Game Reset'));h.click({action:'jump-end'});assert.ok(h.app.innerHTML.includes('Game Reset'));
  h.run("setupSelection.factions=['shield','guard'];setupSelection.skullport=true;quickPenalty=2");h.submit('direct-setup',{});assert.ok(h.app.innerHTML.includes('Game Reset'));
- h.submit('resources',{});assert.ok(h.app.innerHTML.includes('Game Reset'));h.submit('final',{lord:'larissa'});h.submit('final',{lord:'larissa'});assert.equal(h.run('view'),'results');assert.ok(h.app.innerHTML.includes('Game Reset'));
+ h.submit('resources',{});assert.ok(h.app.innerHTML.includes('Game Reset'));h.submit('final',{lord:'larissa'});h.submit('final',{lord:'caladorn'});assert.equal(h.run('view'),'results');assert.ok(h.app.innerHTML.includes('Game Reset'));
  h.run("view='live';render()");assert.ok(h.app.innerHTML.includes('Game Reset'));h.click({action:'end'});assert.match(h.app.innerHTML,/<dialog[\s\S]*Game Reset[\s\S]*<\/dialog>/);
  h.click({action:'new'});assert.equal(h.run('view'),'setup');assert.equal(h.run('game'),null);assert.equal(h.run('penaltyModal'),false);assert.equal(h.run('quickPenalty'),null);assert.equal(h.run('setupSelection.factions.length'),0);assert.equal(h.run('finishOrder.length'),0);assert.ok(!h.app.innerHTML.includes('<dialog'));
 });
@@ -98,4 +97,31 @@ test('starting score fields use text inputs with explicit numeric keypad hints',
  const h=harness();h.click({action:'jump-end'});
  const fields=h.app.innerHTML.match(/<input[^>]+name="score:[^>]+>/g);assert.equal(fields.length,6);
  for(const field of fields){assert.match(field,/type="text"/);assert.match(field,/inputmode="numeric"/);assert.match(field,/pattern="-\?\[0-9\]\*"/);}
+});
+
+test('confirmed Lords block names and unique pills but remain editable by their owner',()=>{
+ const h=harness();h.run("game={players:FACTIONS.slice(0,2).map(f=>({...f,faction:f.id,final:emptyFinal()})),events:[],skullport:false};game.players[0].final={...emptyFinal(),lord:'larissa',confirmed:true};finishIndex=1;finishStep='lord';finishOrder=[0,1];finishPosition=1;view='final';render()");
+ assert.match(h.app.innerHTML,/data-lord="larissa" disabled/);assert.match(h.app.innerHTML,/data-bonus="larissa" disabled/);
+ h.submit('final',{lord:'larissa','count:qualifying':'1'});assert.equal(h.run('game.players[1].final.confirmed'),false);
+ h.run('finishIndex=0;render()');assert.ok(!h.app.innerHTML.includes('data-lord="larissa" disabled'));
+ h.submit('final',{lord:'larissa','count:qualifying':'15'});assert.equal(h.run('game.players[0].final.counts.qualifying'),9);
+});
+test('quest pairing exclusions are symmetric and progressive',()=>{
+ const h=harness();h.run("game={players:FACTIONS.slice(0,5).map(f=>({...f,faction:f.id,final:emptyFinal()})),events:[],skullport:false};finishIndex=4;game.players[0].final.lord=LORDS.find(l=>l.kind==='pair'&&l.types.includes('Warfare')&&l.types.includes('Skullduggery')).id;game.players[0].final.confirmed=true");
+ assert.equal(h.run("questTypeBlocked('Skullduggery',{selectionMode:'types',questTypes:['Warfare']})"),true);
+ assert.equal(h.run("questTypeBlocked('Warfare',{selectionMode:'types',questTypes:['Skullduggery']})"),true);
+ h.run("game.players.forEach(p=>p.final=emptyFinal());['Commerce','Warfare','Piety'].forEach((type,i)=>{game.players[i].final.lord=LORDS.find(l=>l.kind==='pair'&&l.types.includes('Arcana')&&l.types.includes(type)).id;game.players[i].final.confirmed=true})");
+ for(const type of ['Commerce','Warfare','Piety'])assert.equal(h.run("questTypeBlocked('"+type+"',{selectionMode:'types',questTypes:['Arcana']})"),true);
+ assert.equal(h.run("questTypeBlocked('Skullduggery',{selectionMode:'types',questTypes:['Arcana']})"),false);
+ assert.equal(h.run("questTypeBlocked('Arcana',{selectionMode:'types',questTypes:[]})"),false);
+ h.run("game.players[3].final.lord=LORDS.find(l=>l.kind==='pair'&&l.types.includes('Arcana')&&l.types.includes('Skullduggery')).id;game.players[3].final.confirmed=true");
+ assert.equal(h.run("questTypeBlocked('Arcana',{selectionMode:'types',questTypes:[]})"),true);
+});
+
+test('all six quick score fields and faction buttons can activate without Skullport',()=>{
+ const h=harness();h.click({action:'jump-end'});
+ for(const id of ['shield','guard','silverstars','harpers','sashes','hands'])h.focus({name:'score:'+id});
+ assert.equal(h.run('setupSelection.factions.length'),6);
+ h.click({action:'quick-skullport'});h.click({action:'quick-skullport'});assert.equal(h.run('setupSelection.skullport'),false);assert.equal(h.run('setupSelection.factions.length'),6);
+ h.click({faction:'hands'});h.click({faction:'hands'});assert.equal(h.run('setupSelection.factions.length'),6);
 });

@@ -84,3 +84,9 @@ test('empty skull track uses unsigned multiples of ten as recorded losses',()=>{
  assert.throws(()=>scoringEntries({emptyTrack:-10}));
  assert.throws(()=>scoringEntries({emptyTrack:15}));
 });
+
+test('Building Lord bonus is capped at nine controlled buildings',()=>{
+ assert.equal(lordBonus('larissa',{counts:{qualifying:9}}),54);
+ assert.equal(lordBonus('larissa',{counts:{qualifying:25}}),54);
+ assert.equal(lordBonus('danilo',{counts:{qualifying:25}}),75);
+});

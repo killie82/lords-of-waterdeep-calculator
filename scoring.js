@@ -56,7 +56,7 @@ export function lordBonus(lordId, final) {
   if (lord.kind === 'pair') return (counts.pairTotal!==undefined?count(counts.pairTotal):lord.types.reduce((sum,t)=>sum+count(counts[t] ?? 0),0))*4;
   if (lord.kind === 'corruption') return count(final.corruption ?? 0)*4;
   if (lord.kind === 'module') return (counts.moduleTotal!==undefined?count(counts.moduleTotal):count(counts.quests ?? 0)+count(counts.buildings ?? 0))*4;
-  return count(counts.qualifying ?? 0)*lord.rate;
+  return (lord.kind==='builder'?Math.min(count(counts.qualifying ?? 0),9):count(counts.qualifying ?? 0))*lord.rate;
 }
 export function finalScore(live, final, penalty = 0) {
   const adventurers = count(final.adventurers ?? 0);
