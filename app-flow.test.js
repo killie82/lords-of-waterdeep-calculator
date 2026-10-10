@@ -35,10 +35,10 @@ test('Skullport direct setup requires a track value selected inline',()=>{
  h.submit('direct-setup',{'score:shield':'30','score:guard':'40'});assert.equal(h.run('game.penalty'),4);
  h.submit('resources',{'player:0:corruption':'2'});assert.equal(h.run('beforeLordScore(0)'),22);
 });
-test('direct setup rejects invalid scores but allows six factions without module selection',()=>{
+test('direct setup requires an expansion for six factions',()=>{
  const h=harness();h.run("setupSelection.factions=['shield','guard']");h.click({action:'jump-end'});
  h.submit('direct-setup',{'score:shield':'1.5'});assert.equal(h.run('game'),null);
- h.run('setupSelection.factions=FACTIONS.map(f=>f.id)');h.submit('direct-setup',{});assert.equal(h.run('game.players.length'),6);assert.equal(h.run('game.undermountain'),true);
+ h.run('setupSelection.factions=FACTIONS.map(f=>f.id)');h.submit('direct-setup',{});assert.equal(h.run('game'),null);h.click({action:'quick-undermountain'});h.submit('direct-setup',{});assert.equal(h.run('game.players.length'),6);assert.equal(h.run('game.undermountain'),true);
 });
 test('editing initial scores preserves entered resources and saved reveal resumes',()=>{
  const h=harness();h.run("setupSelection.factions=['shield','guard']");h.click({action:'jump-end'});h.submit('direct-setup',{'score:shield':'10','score:guard':'20'});
@@ -118,10 +118,15 @@ test('quest pairing exclusions are symmetric and progressive',()=>{
  assert.equal(h.run("questTypeBlocked('Arcana',{selectionMode:'types',questTypes:[]})"),true);
 });
 
-test('all six quick score fields and faction buttons can activate without Skullport',()=>{
+test('module toggles precede scores and govern sixth faction and last expansion removal',()=>{
  const h=harness();h.click({action:'jump-end'});
- for(const id of ['shield','guard','silverstars','harpers','sashes','hands'])h.focus({name:'score:'+id});
- assert.equal(h.run('setupSelection.factions.length'),6);
- h.click({action:'quick-skullport'});h.click({action:'quick-skullport'});assert.equal(h.run('setupSelection.skullport'),false);assert.equal(h.run('setupSelection.factions.length'),6);
- h.click({faction:'hands'});h.click({faction:'hands'});assert.equal(h.run('setupSelection.factions.length'),6);
+ assert.ok(h.app.innerHTML.indexOf('quick-undermountain')<h.app.innerHTML.indexOf('quick-skullport'));
+ assert.ok(h.app.innerHTML.indexOf('quick-skullport')<h.app.innerHTML.indexOf('direct-factions-panel'));
+ for(const id of ['shield','guard','silverstars','harpers','sashes'])h.focus({name:'score:'+id});
+ h.focus({name:'score:hands',blur(){}});assert.equal(h.run('setupSelection.factions.length'),5);
+ h.click({action:'quick-undermountain'});assert.ok(h.app.innerHTML.includes('Undermountain selected'));h.focus({name:'score:hands'});assert.equal(h.run('setupSelection.factions.length'),6);
+ h.click({action:'quick-undermountain'});assert.equal(h.run('setupSelection.undermountain'),true);
+ h.click({action:'quick-skullport'});assert.ok(h.app.innerHTML.includes('Skullport selected'));h.click({action:'quick-undermountain'});assert.equal(h.run('setupSelection.undermountain'),false);
+ h.click({action:'quick-skullport'});assert.equal(h.run('setupSelection.skullport'),true);
+ h.click({faction:'hands'});h.click({action:'quick-skullport'});assert.equal(h.run('setupSelection.skullport'),false);
 });

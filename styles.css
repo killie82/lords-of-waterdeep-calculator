@@ -103,3 +103,5 @@ body{position:relative}header,main,footer,#notice{position:relative;z-index:1}
 .game-reset-footer{display:flex;justify-content:center;margin-top:28px;padding-top:20px;border-top:1px solid var(--line)}.game-reset-footer button{min-width:150px;color:var(--muted)}dialog .game-reset-footer{margin-top:20px}
 
 .lord-card:disabled strong{text-decoration:line-through}.bonus-pill:disabled{opacity:.28;filter:grayscale(.7);cursor:not-allowed}.bonus-pill:disabled:hover{box-shadow:none}.lord-card:disabled{opacity:.4;cursor:not-allowed}
+
+.direct-undermountain,.direct-skullport{max-width:760px;margin:0 auto 18px}.direct-undermountain .track-picker-button{color:#efa254}.direct-factions-panel{margin-top:24px}

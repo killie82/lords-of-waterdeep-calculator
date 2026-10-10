@@ -109,10 +109,12 @@ function setup() {
 }
 function directSetup() {
   return `<div class="toolbar">${button('back-setup','Back to home','quiet')}<p class="eyebrow">JUMP TO END GAME SCORING</p></div><section class="welcome"><h2>Set the current scores</h2><p>Use the scores before counting leftover cubes, Gold, skulls, or Lord bonuses.</p></section>
-  <form id="direct-setup"><section class="panel direct-factions-panel"><h3>Your factions</h3><p class="hint">Click a score box or faction to include it in player order. A score of 0 counts; untouched blank rows are excluded.</p>
-  ${FACTIONS.map(f=>{const position=setupSelection.factions.indexOf(f.id);return `<div class="direct-score-row" style="--faction:${f.color}"><button type="button" data-faction="${f.id}" aria-pressed="${position>=0}" class="direct-faction ${position>=0?'chosen':''}">${icon(f.icon)}<span><small>${position>=0?'Player '+(position+1):'Tap to include'}</small>${f.name}</span></button><label for="quick-${f.id}"><span class="sr-only">${f.name} current score</span><input id="quick-${f.id}" name="score:${f.id}" type="text" inputmode="numeric" pattern="-?[0-9]*" maxlength="6" autocomplete="off" enterkeyhint="next" placeholder="0" value="${escape(quickScores[f.id]??'')}"></label></div>`}).join('')}</section>
-  <section class="direct-skullport"><button type="button" data-action="quick-skullport" class="track-picker-button ${setupSelection.skullport?'chosen':''}" aria-expanded="${setupSelection.skullport}" aria-controls="quick-track-values">${icon('skull')}<span>Playing with Skullport module?</span></button>
+  <form id="direct-setup">
+  <section class="direct-undermountain"><button type="button" data-action="quick-undermountain" class="track-picker-button ${setupSelection.undermountain?'chosen':''}" aria-pressed="${setupSelection.undermountain}">${icon('mountain')}<span>${setupSelection.undermountain?'Undermountain selected':'Playing with Undermountain module?'}</span></button></section>
+  <section class="direct-skullport"><button type="button" data-action="quick-skullport" class="track-picker-button ${setupSelection.skullport?'chosen':''}" aria-expanded="${setupSelection.skullport}" aria-controls="quick-track-values">${icon('skull')}<span>${setupSelection.skullport?'Skullport selected':'Playing with Skullport module?'}</span></button>
   ${setupSelection.skullport?`<div id="quick-track-values"><p class="hint">Choose the current corruption penalty per skull.</p><button type="button" data-quick-penalty="0" class="full-track-option ${quickPenalty===0?'chosen':''}" aria-pressed="${quickPenalty===0}">0 VP, All skulls on corruption track</button><div class="track-values">${Array.from({length:9},(_,i)=>i+1).map(n=>`<button type="button" data-quick-penalty="${n}" class="${quickPenalty===n?'chosen':''}" aria-pressed="${quickPenalty===n}">${icon('skull')}<span>−${n} VP</span></button>`).join('')}</div></div>`:''}</section>
+  <section class="panel direct-factions-panel"><h3>Your factions</h3><p class="hint">Click a score box or faction to include it in player order. A score of 0 counts; untouched blank rows are excluded.</p>
+  ${FACTIONS.map(f=>{const position=setupSelection.factions.indexOf(f.id);return `<div class="direct-score-row" style="--faction:${f.color}"><button type="button" data-faction="${f.id}" aria-pressed="${position>=0}" class="direct-faction ${position>=0?'chosen':''}">${icon(f.icon)}<span><small>${position>=0?'Player '+(position+1):'Tap to include'}</small>${f.name}</span></button><label for="quick-${f.id}"><span class="sr-only">${f.name} current score</span><input id="quick-${f.id}" name="score:${f.id}" type="text" inputmode="numeric" pattern="-?[0-9]*" maxlength="6" autocomplete="off" enterkeyhint="next" placeholder="0" value="${escape(quickScores[f.id]??'')}"></label></div>`}).join('')}</section>
   <div class="setup-start"><p class="hint">${setupSelection.factions.length} factions selected${setupSelection.skullport&&quickPenalty===null?' · Choose the Corruption track value':''}</p><button class="primary" type="submit" ${setupSelection.factions.length<2||(setupSelection.skullport&&quickPenalty===null)?'disabled':''}>Count final resources →</button></div></form>`;
 }
 function openDirectSetup() {
@@ -300,7 +302,7 @@ app.addEventListener('beforeinput',e=>{
 });
 function includeQuickFaction(id) {
   if(setupSelection.factions.includes(id))return true;
-  if(setupSelection.factions.length>=6){say('Up to six factions can be included.');return false;}
+  if(setupSelection.factions.length>=(setupSelection.undermountain||setupSelection.skullport?6:5)){say('Select an expansion module to include a sixth faction.');return false;}
   setupSelection.factions.push(id);return true;
 }
 app.addEventListener('focusin',e=>{
@@ -333,12 +335,12 @@ app.addEventListener('submit',e=>{
       for(const f of FACTIONS){const value=data.get('score:'+f.id);if(value!==null&&String(value).trim()!==''&&!includeQuickFaction(f.id))throw new Error('Too many factions for the selected game.');}
       const {factions,undermountain,skullport}=setupSelection;
       if(factions.length<2||new Set(factions).size!==factions.length)throw new Error('Choose at least two factions.');
-      if(factions.length>6)throw new Error('Choose up to six factions.');
+      if(factions.length>6||factions.length>5&&!undermountain&&!skullport)throw new Error('Select an expansion module for six factions.');
       const penalty=skullport?skullTrackPenalty(quickPenalty):1;
       const scores=factions.map(id=>points(data.get('score:'+id)||0));
       const old=game?.directEnd?game.players:[];
       const players=factions.map(id=>{const f=FACTIONS.find(f=>f.id===id);return {faction:id,name:f.name,color:f.color,final:{...(old.find(p=>p.faction===id)?.final||emptyFinal()),confirmed:false}};});
-      game={version:1,directEnd:true,players,events:scores.map((score,i)=>({id:crypto.randomUUID(),player:i,source:'other',points:score,note:'Score before final scoring',round:null})),round:1,trackRounds:false,penalty,undermountain:undermountain||(factions.length===6&&!skullport),skullport,finished:false};
+      game={version:1,directEnd:true,players,events:scores.map((score,i)=>({id:crypto.randomUUID(),player:i,source:'other',points:score,note:'Score before final scoring',round:null})),round:1,trackRounds:false,penalty,undermountain,skullport,finished:false};
       selected=0;beginFinalScoring();
     } else if(e.target.id==='setup') {
       const {undermountain,skullport,factions}=setupSelection;
@@ -397,7 +399,7 @@ app.addEventListener('click',e=>{
   if(b.dataset.faction){
     const id=b.dataset.faction,index=setupSelection.factions.indexOf(id);
     if(index>=0){setupSelection.factions.splice(index,1);if(view==='direct')quickScores[id]='';}
-    else {if(view!=='direct'&&setupSelection.factions.length===5&&!setupSelection.undermountain&&!setupSelection.skullport){say('Base supports up to five factions. Select an expansion to add a sixth.');return;}setupSelection.factions.push(id);}
+    else {if(setupSelection.factions.length===5&&!setupSelection.undermountain&&!setupSelection.skullport){say('Base supports up to five factions. Select an expansion to add a sixth.');return;}setupSelection.factions.push(id);}
     render();app.querySelector(`[data-faction="${id}"]`).focus();say(setupSelection.factions.length+' factions selected.');
   }
   if(b.dataset.skullStep){const draft=entryDraft();draft.values.emptyTrack=Math.max(0,Math.min(10000,count(draft.values.emptyTrack||0)+(b.dataset.skullStep==='plus'?10:-10)));save();const row=app.querySelector('.empty-track-row');row.outerHTML=emptyTrackRow();return;}
@@ -410,7 +412,8 @@ app.addEventListener('click',e=>{
     case 'jump-end':openDirectSetup();break;
     case 'direct-state':try{readResources(app.querySelector('#resources'));openDirectSetup();}catch(error){say(error.message);}break;
     case 'back-setup':view='setup';render();window.scrollTo(0,0);break;
-    case 'quick-skullport':setupSelection.skullport=!setupSelection.skullport;render();app.querySelector('[data-action="quick-skullport"]').focus({preventScroll:true});break;
+    case 'quick-undermountain':
+    case 'quick-skullport':{const module=b.dataset.action==='quick-undermountain'?'undermountain':'skullport';if(setupSelection[module]&&setupSelection.factions.length===6&&!setupSelection[module==='skullport'?'undermountain':'skullport']){say('Remove a faction before turning off the last expansion. Base supports up to five players.');break;}setupSelection[module]=!setupSelection[module];render();app.querySelector('[data-action="'+b.dataset.action+'"]').focus({preventScroll:true});break;}
     case 'undo':if(game.events.length){const latest=game.events.at(-1);if(latest.batch)game.events=game.events.filter(e=>e.batch!==latest.batch);else game.events.pop();game.finished=false;game.players.forEach(p=>p.final.confirmed=false);save();render();say('Latest submission undone.');}break;
     case 'enable-rounds':game.trackRounds=true;save();render();say('Round tracking enabled. Set the current round for your table.');break;
     case 'disable-rounds':game.trackRounds=false;save();render();say('Round tracking turned off.');break;
