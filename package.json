@@ -6,5 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test scoring.test.js app-flow.test.js"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

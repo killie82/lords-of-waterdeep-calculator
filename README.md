@@ -48,3 +48,7 @@ Unofficial fan project, not affiliated with Wizards of the Coast. Game titles an
 End-game resources are entered for every faction on one page. Reveal order is based on live points plus leftover Adventurers and Gold minus Corruption penalties, before Lord bonuses. Ties follow player number; that order stays fixed during the reveal.
 
 Use “Jump to end game scoring” on the home page to choose expansions and factions in player order, enter current scores (before resources or Lord bonuses), and choose the Skullport track value if applicable. Continue to the shared resource screen and then the ordered Lord reveal.
+
+## GitHub Pages and Node 24
+
+The Pages workflow uses Node 24 and Node 24-compatible GitHub actions. It runs the tests before deploying only the static website files. After pushing the workflow, set Settings → Pages → Build and deployment → Source to GitHub Actions (instead of Deploy from a branch). Then run “Test and deploy Pages” from the Actions tab or push a new commit to main. The built-in branch deployment workflow is managed by GitHub and cannot be upgraded from this repository.
