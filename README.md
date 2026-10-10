@@ -44,3 +44,7 @@ With Node.js installed, run `npm start` and open http://127.0.0.1:4180. Run `npm
 - [Official expansion rules](https://media.wizards.com/downloads/dnd/SOS_Rulebook.pdf)
 
 Unofficial fan project, not affiliated with Wizards of the Coast. Game titles and Lord names belong to their respective owners. Card selection uses text labels rather than copied artwork.
+
+End-game resources are entered for every faction on one page. Reveal order is based on live points plus leftover Adventurers and Gold minus Corruption penalties, before Lord bonuses. Ties follow player number; that order stays fixed during the reveal.
+
+Use “Jump to end game scoring” on the home page to choose expansions and factions in player order, enter current scores (before resources or Lord bonuses), and choose the Skullport track value if applicable. Continue to the shared resource screen and then the ordered Lord reveal.

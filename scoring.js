@@ -38,12 +38,13 @@ export function points(value) {
 export const liveScore = (player, events) => events.filter(e=>e.player===player).reduce((sum,e)=>sum+e.points,0);
 export function scoringEntries(values) {
   const entries=[];
-  for (const source of ['quest','gems','intrigue','building','plot','other']) {
+  for (const source of ['quest','gems','intrigue','building','plot','emptyTrack','other']) {
     const raw=String(values[source]??'').trim();
     if (!raw) continue;
     if (!(source==='other'?/^-?\d+$/:/^\d+$/).test(raw)) throw new Error(source==='other'?'Corrections must be whole numbers.':'Only Other / correction allows point losses. Use whole positive numbers in the other sections.');
     const amount=source==='other'?points(raw):count(raw);
-    if(amount)entries.push({source,points:amount});
+    if(source==='emptyTrack'&&amount%10!==0)throw new Error('Empty skull track penalties must be multiples of 10.');
+    if(amount)entries.push({source,points:source==='emptyTrack'?-amount:amount});
   }
   if(!entries.length)throw new Error('Enter points in at least one section.');
   return entries;
@@ -73,7 +74,8 @@ export function finalScoringOrder(scores) {
     .sort((a,b)=>a.score-b.score||a.index-b.index).map(row=>row.index);
 }
 export function skullTrackPenalty(value) {
+  if(value===null||value===undefined||String(value).trim()==='')throw new Error('Choose a skull track value from 0 through 9.');
   const n=count(value);
-  if(n<1||n>9)throw new Error('Choose a skull track penalty from 1 through 9.');
+  if(n>9)throw new Error('Choose a skull track value from 0 through 9.');
   return n;
 }

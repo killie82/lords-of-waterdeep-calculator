@@ -62,9 +62,9 @@ test('final reveal order is last to first with ties in player number order',()=>
  assert.deepEqual(finalScoringOrder([10,10,10]),[0,1,2]);
  assert.deepEqual(finalScoringOrder([30,30,10,10]),[2,3,0,1]);
 });
-test('Skullport modal penalty permits only 1 through 9',()=>{
- for(let i=1;i<=9;i++)assert.equal(skullTrackPenalty(String(i)),i);
- for(const n of [null,'',0,-1,10,1.5,'abc'])assert.throws(()=>skullTrackPenalty(n));
+test('Skullport track value permits 0 through 9 but requires an explicit choice',()=>{
+ for(let i=0;i<=9;i++)assert.equal(skullTrackPenalty(String(i)),i);
+ for(const n of [null,undefined,'',-1,10,1.5,'abc'])assert.throws(()=>skullTrackPenalty(n));
 });
 test('Lord availability follows the selected game modules',()=>{
  const skullport=['irusyl','sangalor','xanathar'],undermountain=['danilo','halaster','trobriand'];
@@ -75,4 +75,12 @@ test('Lord availability follows the selected game modules',()=>{
    for(const lord of LORDS.filter(l=>l.module==='base'))assert.equal(isLordAvailable(lord.id,modules),true);
  }
  assert.equal(isLordAvailable('unknown',{skullport:true,undermountain:true}),false);
+});
+
+test('empty skull track uses unsigned multiples of ten as recorded losses',()=>{
+ assert.deepEqual(scoringEntries({emptyTrack:20}),[{source:'emptyTrack',points:-20}]);
+ assert.deepEqual(scoringEntries({plot:5,emptyTrack:10,other:3}),[{source:'plot',points:5},{source:'emptyTrack',points:-10},{source:'other',points:3}]);
+ assert.deepEqual(scoringEntries({quest:7,emptyTrack:0}),[{source:'quest',points:7}]);
+ assert.throws(()=>scoringEntries({emptyTrack:-10}));
+ assert.throws(()=>scoringEntries({emptyTrack:15}));
 });
