@@ -93,3 +93,9 @@ test('Game Reset is available on every page and clears modal and temporary state
 test('wheel scroll defocuses numeric fields without blocking normal text fields',()=>{
  const h=harness();assert.equal(h.wheel('number'),true);assert.equal(h.wheel('text'),false);
 });
+
+test('starting score fields use text inputs with explicit numeric keypad hints',()=>{
+ const h=harness();h.click({action:'jump-end'});
+ const fields=h.app.innerHTML.match(/<input[^>]+name="score:[^>]+>/g);assert.equal(fields.length,6);
+ for(const field of fields){assert.match(field,/type="text"/);assert.match(field,/inputmode="numeric"/);assert.match(field,/pattern="-\?\[0-9\]\*"/);}
+});
